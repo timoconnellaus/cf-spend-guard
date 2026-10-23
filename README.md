@@ -15,7 +15,7 @@ cf-spend-guard is a small Worker you deploy into your own account. Every 5 minut
 
 It runs on your account, uses your own API token, and sends your data nowhere except the alert channels you set up.
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/OWNER/cf-spend-guard)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/timoconnellaus/cf-spend-guard)
 
 > **Cost of the guard itself:** one scheduled Worker invocation and a handful of small D1 queries every 5 minutes (~8,600 runs/month). That fits comfortably inside the Workers Paid plan's included usage.
 
@@ -35,7 +35,7 @@ It runs on your account, uses your own API token, and sends your data nowhere ex
 ### Option B: Wrangler
 
 ```sh
-git clone https://github.com/OWNER/cf-spend-guard && cd cf-spend-guard
+git clone https://github.com/timoconnellaus/cf-spend-guard && cd cf-spend-guard
 npm install
 npx wrangler secret put CF_API_TOKEN
 npx wrangler secret put ADMIN_TOKEN
