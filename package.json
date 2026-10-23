@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --test-scheduled",
-    "deploy": "npm run db:migrate && wrangler deploy",
+    "deploy": "wrangler deploy",
     "db:migrate": "wrangler d1 migrations apply DB --remote",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "typecheck": "tsc --noEmit",

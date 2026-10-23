@@ -15,6 +15,14 @@ Issues and PRs are welcome, especially new collectors and pricing fixes.
    (with ids redacted) in the PR. Most collector bugs are field names the docs
    don't mention.
 
+## Changing the database schema
+
+Add a new numbered file in `migrations/` and append it to `MIGRATIONS` in
+`src/migrate.ts`. The Worker applies pending migrations itself on its next run,
+so deploys don't depend on a migration command. Keep statements free of `;`
+inside strings or triggers (the migration is split on `;`), and never edit a
+migration that has shipped.
+
 ## Ground rules
 
 - The guard must stay cheap to run and must fail loudly, not silently.

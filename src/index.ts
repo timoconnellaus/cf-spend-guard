@@ -6,6 +6,7 @@ import dashboard from "./dashboard.html";
 import { BUCKET_MS, BUCKETS_PER_HOUR } from "./detect";
 import { bucketFor, monthSummary, runGuard } from "./guard";
 import { pauseScript, restoreScript, SELF_SCRIPT } from "./killswitch";
+import { ensureSchema } from "./migrate";
 import { sendAlert } from "./notify";
 import { PRODUCTS } from "./pricing";
 import { history } from "./history";
@@ -19,6 +20,7 @@ const RANGES: Record<string, number> = { "6": 5 * 60_000, "24": 15 * 60_000, "16
 export default {
   async scheduled(_controller, env) {
     const config = loadConfig(env.GUARD_CONFIG);
+    await ensureSchema(env.DB);
     const report = await runGuard(env, config);
     console.log(
       JSON.stringify({
@@ -55,6 +57,7 @@ export default {
 
     try {
       const config = loadConfig(env.GUARD_CONFIG);
+      await ensureSchema(env.DB);
       const client = new CloudflareClient(env.CF_API_TOKEN);
       const store = new Store(env.DB);
       const route = `${request.method} ${url.pathname}`;

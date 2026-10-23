@@ -29,7 +29,7 @@ It runs on your account, uses your own API token, and sends your data nowhere ex
 
 ### Option A: Deploy to Cloudflare button
 
-1. Click **Deploy to Cloudflare** above. Cloudflare forks this repo into your GitHub or GitLab account, creates the D1 database, runs the migrations and deploys.
+1. Click **Deploy to Cloudflare** above. Cloudflare forks this repo into your GitHub or GitLab account, creates the D1 database and deploys.
 2. When asked for secrets, fill in:
    - `CF_API_TOKEN`: see [API token](#api-token) below.
    - `ADMIN_TOKEN`: any long random string (`openssl rand -hex 32`).
@@ -44,8 +44,14 @@ npm install
 npx wrangler secret put CF_API_TOKEN
 npx wrangler secret put ADMIN_TOKEN
 npx wrangler secret put SLACK_WEBHOOK_URL   # or another channel
-npm run deploy                              # creates the D1 DB, migrates, deploys
+npm run deploy                              # creates the D1 database on first deploy
 ```
+
+### Option C: Import the repo in the Cloudflare dashboard
+
+**Workers & Pages → Create → Import a repository**, pick your copy of this repo, and accept the defaults (`npx wrangler deploy` is fine). Every push to `main` redeploys. Add the secrets under the Worker's **Settings → Variables and Secrets** after the first deploy.
+
+> **Database setup is automatic.** However the guard is deployed, the Worker creates its tables on its first run and records them in D1's standard `d1_migrations` table, so `wrangler d1 migrations apply` stays in sync and nothing runs twice.
 
 ### Open the dashboard
 
@@ -256,7 +262,6 @@ npm install
 npm test            # unit + end-to-end tests (node:sqlite stands in for D1)
 npm run typecheck
 cp .dev.vars.example .dev.vars   # add a real token
-npm run db:migrate:local
 npm run dev         # then: curl "localhost:8787/__scheduled?cron=*/5+*+*+*+*"
 ```
 

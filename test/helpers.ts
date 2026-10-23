@@ -2,11 +2,13 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 
-/** Minimal D1 stand-in backed by node:sqlite, with the real migrations applied. */
-export function createD1(): D1Database {
+/** Minimal D1 stand-in backed by node:sqlite. By default the migrations are applied directly. */
+export function createD1({ migrate = true } = {}): D1Database {
   const db = new DatabaseSync(":memory:");
-  const dir = new URL("../migrations/", import.meta.url);
-  for (const file of readdirSync(dir).sort()) db.exec(readFileSync(new URL(file, dir), "utf8"));
+  if (migrate) {
+    const dir = new URL("../migrations/", import.meta.url);
+    for (const file of readdirSync(dir).sort()) db.exec(readFileSync(new URL(file, dir), "utf8"));
+  }
 
   const prepare = (sql: string, params: unknown[] = []): any => {
     const run = () => db.prepare(sql).all(...(params as any[]));
