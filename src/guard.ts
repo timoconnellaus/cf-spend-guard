@@ -102,21 +102,16 @@ export async function runGuard(env: Env, config: GuardConfig, now = Date.now()):
 
   // 3. Monthly budget, projected from the last 24 hours' average.
   if (config.monthlyBudgetUsd) {
-    const { monthStart } = projectMonth(now, 0, 0);
-    const mtd = await store.costSince(monthStart);
-    const dayCollected = await store.collectedBuckets(bucket - DAY + BUCKET_MS, bucket + BUCKET_MS);
-    const dayCost = await store.costSince(bucket - DAY + BUCKET_MS);
-    const avgHourly = dayCollected.length ? (dayCost / dayCollected.length) * BUCKETS_PER_HOUR : 0;
-    const p = projectMonth(now, mtd, avgHourly);
-    if (p.projectedUsd > config.monthlyBudgetUsd) {
+    const m = await monthSummary(store, now, bucket);
+    if (m.projectedUsd > config.monthlyBudgetUsd) {
       alerts.push({
-        key: `budget:${new Date(monthStart).toISOString().slice(0, 7)}`,
-        severity: mtd > config.monthlyBudgetUsd ? "critical" : "warning",
+        key: `budget:${new Date(m.monthStart).toISOString().slice(0, 7)}`,
+        severity: m.monthToDateUsd > config.monthlyBudgetUsd ? "critical" : "warning",
         kind: "budget",
         cooldownMinutes: 24 * 60,
         title: `On track to exceed the ${usd(config.monthlyBudgetUsd)} monthly budget`,
         lines: [
-          `Estimated usage so far this month: ${usd(mtd)}. Projected: ${usd(p.projectedUsd)} at the last 24h average (${usd(avgHourly)}/hour).`,
+          `Estimated usage so far this month: ${usd(m.monthToDateUsd)}. Projected: ${usd(m.projectedUsd)} at the last 24h average (${usd(m.avgHourlyUsd)}/hour).`,
         ],
       });
     }
@@ -148,6 +143,17 @@ export async function runGuard(env: Env, config: GuardConfig, now = Date.now()):
     alerts,
     paused,
   };
+}
+
+/** Month-to-date estimate and month-end projection from the last 24h average burn. */
+export async function monthSummary(store: Store, now: number, latestBucket: number) {
+  const { monthStart } = projectMonth(now, 0, 0);
+  const mtd = await store.costSince(monthStart);
+  const daySince = latestBucket - DAY + BUCKET_MS;
+  const dayCollected = await store.collectedBuckets(daySince, latestBucket + BUCKET_MS);
+  const dayCost = await store.costSince(daySince);
+  const avgHourlyUsd = dayCollected.length ? (dayCost / dayCollected.length) * BUCKETS_PER_HOUR : 0;
+  return { ...projectMonth(now, mtd, avgHourlyUsd), avgHourlyUsd };
 }
 
 async function runKillSwitch(

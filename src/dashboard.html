@@ -1,0 +1,928 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spend Guard</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2 4 7v8c0 7.5 5.1 13.4 12 15 6.9-1.6 12-7.5 12-15V7z' fill='%232a78d6'/%3E%3Cpath d='M16 9v14M12 13h6a2.5 2.5 0 0 1 0 5h-4a2.5 2.5 0 0 0 0 5h6' stroke='%23fff' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --surface-2: #f3f2ef;
+  --text: #0b0b0b;
+  --text-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.10);
+  --accent: #2a78d6;
+  --accent-ink: #ffffff;
+  --good: #0ca30c;
+  --good-text: #006300;
+  --warning: #fab219;
+  --critical: #d03b3b;
+  --critical-text: #b42c2c;
+  --track: #e1e0d9;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300;
+  --other: #898781;
+  --shadow: 0 1px 2px rgba(11, 11, 11, 0.04), 0 4px 16px rgba(11, 11, 11, 0.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
+    --text: #f0efec; --text-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.10);
+    --accent: #3987e5; --good-text: #0ca30c; --critical-text: #e66767; --track: #2c2c2a;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300;
+    --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
+  --text: #f0efec; --text-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.10);
+  --accent: #3987e5; --good-text: #0ca30c; --critical-text: #e66767; --track: #2c2c2a;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300;
+  --shadow: none;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--page);
+  color: var(--text);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select { font: inherit; color: inherit; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
+
+header.top {
+  position: sticky; top: 0; z-index: 5;
+  background: color-mix(in srgb, var(--page) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+header.top .wrap { display: flex; align-items: center; gap: 12px; min-height: 56px; flex-wrap: wrap; padding-top: 8px; padding-bottom: 8px; }
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; }
+.brand svg { width: 22px; height: 22px; }
+.meta { color: var(--text-2); font-size: 13px; margin-right: auto; display: flex; gap: 12px; flex-wrap: wrap; }
+.meta .who { color: var(--muted); }
+@media (max-width: 600px) { .meta { order: 3; flex-basis: 100%; } .brand { margin-right: auto; } }
+
+.btn {
+  border: 1px solid var(--border); background: var(--surface); border-radius: 8px;
+  padding: 6px 12px; cursor: pointer; white-space: nowrap;
+}
+.btn:hover { background: var(--surface-2); }
+.btn:disabled { opacity: 0.55; cursor: progress; }
+.btn.primary { background: var(--accent); border-color: transparent; color: var(--accent-ink); }
+.btn.primary:hover { filter: brightness(1.06); }
+.btn.danger { color: var(--critical-text); }
+.btn.small { padding: 3px 9px; font-size: 13px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+main.wrap { padding-top: 20px; padding-bottom: 48px; }
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: var(--shadow); padding: 18px 20px; min-width: 0;
+}
+.card h2 { font-size: 15px; font-weight: 600; margin: 0; }
+.card .sub { color: var(--text-2); font-size: 13px; margin: 2px 0 0; }
+.card-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.card-head > div:first-child { margin-right: auto; }
+.stack { display: grid; gap: 16px; }
+.grid2 { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); align-items: start; }
+
+.banner { border-radius: 10px; padding: 10px 14px; display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--border); background: var(--surface); }
+.banner.critical { border-color: color-mix(in srgb, var(--critical) 45%, transparent); }
+.banner.warning { border-color: color-mix(in srgb, var(--warning) 60%, transparent); }
+.banner b { font-weight: 600; }
+
+.filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: transparent; padding: 6px 14px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button[aria-pressed="true"] { background: var(--surface-2); font-weight: 600; }
+select.input, input.input {
+  border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 6px 10px; min-width: 0;
+}
+
+.stats { display: grid; gap: 16px; grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)); }
+@media (max-width: 900px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .stats .hero { grid-column: 1 / -1; } }
+@media (max-width: 480px) { .stats { grid-template-columns: minmax(0, 1fr); } }
+.stat .label { color: var(--text-2); font-size: 13px; }
+.stat .value { font-size: 26px; font-weight: 600; letter-spacing: -0.01em; margin-top: 4px; }
+.stat .note { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+.hero .value { font-size: 48px; line-height: 1.05; letter-spacing: -0.02em; }
+.hero .value small { font-size: 18px; font-weight: 500; color: var(--text-2); letter-spacing: 0; }
+.meter { height: 6px; border-radius: 3px; background: var(--track); margin-top: 10px; overflow: hidden; }
+.meter > div { height: 100%; border-radius: 3px; background: var(--accent); }
+.meter.warn > div { background: var(--warning); }
+.meter.over > div { background: var(--critical); }
+
+.status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; }
+.status svg { width: 14px; height: 14px; flex: none; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 10px; padding: 0; list-style: none; }
+.legend li { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-2); }
+.legend button { all: unset; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; border-radius: 4px; }
+.legend button:hover .name { color: var(--text); text-decoration: underline; }
+.legend .sw { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.legend .amt { color: var(--text); font-variant-numeric: tabular-nums; }
+
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: 280px; overflow: visible; }
+.chart svg:focus { outline: none; }
+.chart svg:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
+.chart .tick { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.chart.loading svg { opacity: 0.5; transition: opacity 0.2s; }
+.empty { color: var(--muted); text-align: center; padding: 56px 0; }
+.tip {
+  position: absolute; pointer-events: none; z-index: 3; min-width: 180px; max-width: 280px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,0.14);
+  padding: 8px 10px; font-size: 12.5px;
+}
+.tip .t { color: var(--text-2); margin-bottom: 4px; }
+.tip .row { display: grid; grid-template-columns: 12px 1fr; gap: 0 8px; align-items: center; padding: 2px 0; }
+.tip .key { width: 12px; height: 2px; border-radius: 1px; }
+.tip .row b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.tip .row span { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tip .row .val { display: flex; gap: 6px; min-width: 0; }
+.tip .total { border-top: 1px solid var(--grid); margin-top: 4px; padding-top: 4px; }
+.tip .gap { color: var(--muted); margin-top: 4px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; font-weight: 500; color: var(--text-2); border-bottom: 1px solid var(--grid); padding: 6px 8px; white-space: nowrap; }
+td { border-bottom: 1px solid var(--grid); padding: 7px 8px; vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.res { overflow-wrap: anywhere; }
+td.res .pill { margin-top: 3px; }
+.tablewrap { overflow-x: auto; max-height: 360px; overflow-y: auto; }
+.share { display: inline-block; height: 6px; border-radius: 3px; background: var(--accent); vertical-align: middle; margin-left: 8px; min-width: 2px; }
+.pill { display: inline-block; font-size: 11.5px; padding: 1px 7px; border-radius: 999px; background: var(--surface-2); color: var(--text-2); white-space: nowrap; }
+
+.events { list-style: none; margin: 0; padding: 0; max-height: 440px; overflow-y: auto; }
+.events li { border-bottom: 1px solid var(--grid); padding: 9px 0; }
+.events li:last-child { border-bottom: 0; }
+.events .line { display: flex; gap: 10px; align-items: baseline; }
+.events .title { font-weight: 500; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.events time { color: var(--muted); font-size: 12px; white-space: nowrap; }
+details summary { cursor: pointer; color: var(--text-2); font-size: 12.5px; margin-top: 2px; }
+pre { margin: 6px 0 0; background: var(--surface-2); border-radius: 8px; padding: 10px 12px; overflow: auto; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; max-height: 420px; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.row-form { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.row-form .input { flex: 1 1 180px; }
+.checks { list-style: none; margin: 0; padding: 0; }
+.checks li { display: flex; gap: 10px; justify-content: space-between; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--grid); }
+.checks li:last-child { border-bottom: 0; }
+.checks .err { color: var(--critical-text); font-size: 12.5px; overflow-wrap: anywhere; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.result { margin-top: 10px; font-size: 13px; }
+.hint { color: var(--muted); font-size: 12.5px; }
+
+#login { max-width: 440px; margin: 10vh auto 0; }
+#login .card { padding: 24px; }
+#login h1 { font-size: 20px; margin: 0 0 6px; }
+#login p { color: var(--text-2); margin: 0 0 16px; }
+#login form { display: flex; gap: 8px; }
+#login .input { flex: 1; }
+.error { color: var(--critical-text); margin-top: 10px; font-size: 13px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2 4 7v8c0 7.5 5.1 13.4 12 15 6.9-1.6 12-7.5 12-15V7z" fill="var(--accent)"/><path d="M16 9v14M12 13h6a2.5 2.5 0 0 1 0 5h-4a2.5 2.5 0 0 0 0 5h6" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+      cf-spend-guard
+    </div>
+    <div class="meta" id="meta"></div>
+    <button class="btn" id="refresh" hidden>Refresh</button>
+    <button class="btn" id="signout" hidden>Sign out</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="login" hidden>
+    <div class="card">
+      <h1>Sign in</h1>
+      <p id="login-text">Paste the <code>ADMIN_TOKEN</code> you set when deploying. It's kept in this browser only.</p>
+      <form id="login-form">
+        <label class="sr" for="token">Admin token</label>
+        <input class="input" id="token" type="password" autocomplete="current-password" placeholder="Admin token" required>
+        <button class="btn primary" type="submit">Sign in</button>
+      </form>
+      <div class="error" id="login-error" role="alert"></div>
+    </div>
+  </section>
+
+  <div id="app" class="stack" hidden>
+    <div id="banners" class="stack"></div>
+
+    <div class="filters" role="group" aria-label="Filters">
+      <div class="seg" id="range" role="group" aria-label="Time range">
+        <button data-hours="6">6 hours</button>
+        <button data-hours="24">24 hours</button>
+        <button data-hours="168">7 days</button>
+      </div>
+      <label class="sr" for="product">Product</label>
+      <select class="input" id="product">
+        <option value="">All products</option>
+      </select>
+    </div>
+
+    <section class="stats" aria-label="Summary">
+      <div class="card stat hero">
+        <div class="label">Burning now</div>
+        <div class="value" id="now-rate">–</div>
+        <div class="note" id="now-note"></div>
+      </div>
+      <div class="card stat">
+        <div class="label" id="range-label">Last 24 hours</div>
+        <div class="value" id="range-total">–</div>
+        <div class="note" id="range-note"></div>
+      </div>
+      <div class="card stat">
+        <div class="label">Month to date</div>
+        <div class="value" id="mtd">–</div>
+        <div class="note" id="mtd-note"></div>
+      </div>
+      <div class="card stat">
+        <div class="label">Projected this month</div>
+        <div class="value" id="proj">–</div>
+        <div class="meter" id="proj-meter" hidden><div></div></div>
+        <div class="note" id="proj-note"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h2 id="chart-title">Estimated spend by product</h2>
+          <p class="sub" id="chart-sub"></p>
+        </div>
+        <button class="btn small" id="toggle-table" aria-expanded="false">Show table</button>
+      </div>
+      <ul class="legend" id="legend"></ul>
+      <div class="chart" id="chart"></div>
+      <div class="tablewrap" id="chart-table" hidden></div>
+    </section>
+
+    <div class="grid2">
+      <section class="card">
+        <div class="card-head"><div><h2>Top spenders</h2><p class="sub" id="top-sub"></p></div></div>
+        <div class="tablewrap" id="top"></div>
+      </section>
+      <section class="card">
+        <div class="card-head"><div><h2>Alerts and actions</h2><p class="sub">Most recent first</p></div></div>
+        <ul class="events" id="events"></ul>
+      </section>
+    </div>
+
+    <div class="grid2">
+      <section class="card">
+        <div class="card-head"><div><h2>Kill switch</h2><p class="sub" id="ks-sub"></p></div></div>
+        <div id="paused"></div>
+        <form class="row-form" id="pause-form">
+          <label class="sr" for="pause-script">Worker name</label>
+          <input class="input" id="pause-script" placeholder="Worker name" required autocomplete="off" spellcheck="false">
+          <button class="btn" type="submit" data-dry="1">Preview</button>
+          <button class="btn danger" type="submit" data-dry="0">Pause</button>
+        </form>
+        <div class="result" id="pause-result" role="status"></div>
+      </section>
+      <section class="card">
+        <div class="card-head"><div><h2>Health</h2><p class="sub">Data collection in the latest run</p></div></div>
+        <ul class="checks" id="health"></ul>
+        <div class="actions">
+          <button class="btn" id="doctor">Run full check</button>
+          <button class="btn" id="test-alert">Send test alert</button>
+          <button class="btn" id="run-now">Collect now</button>
+        </div>
+        <div class="result" id="health-result" role="status"></div>
+      </section>
+    </div>
+
+    <section class="card">
+      <div class="card-head">
+        <div><h2>Configuration</h2><p class="sub">Read-only. Change it in <code>GUARD_CONFIG</code> (wrangler.jsonc or a secret) and redeploy.</p></div>
+      </div>
+      <div id="config-summary"></div>
+      <details><summary>Full configuration</summary><pre id="config"></pre></details>
+    </section>
+  </div>
+</main>
+
+<script>
+(() => {
+  "use strict";
+
+  const PRODUCTS = ["workers", "r2", "kv", "d1", "durable_objects", "queues"];
+  const PRODUCT_NAMES = { workers: "Workers", r2: "R2", kv: "KV", d1: "D1", durable_objects: "Durable Objects", queues: "Queues" };
+  const SLOTS = ["--s1", "--s2", "--s3", "--s4", "--s5", "--s6"];
+  const TOKEN_KEY = "cf-spend-guard.token";
+  const PREFS_KEY = "cf-spend-guard.prefs";
+
+  const $ = (id) => document.getElementById(id);
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} },
+  };
+  const prefs = (() => { try { return JSON.parse(store.get(PREFS_KEY) || "{}"); } catch { return {}; } })();
+  const state = { token: store.get(TOKEN_KEY), hours: prefs.hours || "24", product: "", status: null, history: null, showTable: false };
+
+  // ---------- formatting ----------
+  function usd(n) {
+    if (n == null || !isFinite(n)) return "–";
+    const a = Math.abs(n);
+    if (a >= 1e6) return "$" + (n / 1e6).toFixed(2) + "M";
+    if (a >= 10000) return "$" + (n / 1e3).toFixed(1) + "K";
+    if (a >= 100) return "$" + n.toFixed(0);
+    if (a >= 1) return "$" + n.toFixed(2);
+    if (a >= 0.01) return "$" + n.toFixed(3);
+    if (a === 0) return "$0";
+    return "<$0.01";
+  }
+  function axisUsd(n) {
+    if (n === 0) return "$0";
+    if (n >= 1000) return "$" + +(n / 1000).toFixed(1) + "K";
+    if (n >= 1) return "$" + +n.toFixed(2);
+    return "$" + +n.toPrecision(2);
+  }
+  const fmtTime = (t, withDate) => new Date(t).toLocaleString(undefined, withDate
+    ? { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }
+    : { hour: "numeric", minute: "2-digit" });
+  function ago(t) {
+    const s = Math.round((Date.now() - t) / 1000);
+    if (s < 60) return "just now";
+    if (s < 3600) return Math.round(s / 60) + " min ago";
+    if (s < 86400) return Math.round(s / 3600) + " h ago";
+    return Math.round(s / 86400) + " d ago";
+  }
+  const productName = (p) => PRODUCT_NAMES[p] || p;
+
+  // ---------- DOM helpers (text only, never innerHTML with data) ----------
+  function el(tag, attrs, ...children) {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (v == null || v === false) continue;
+      if (k === "class") node.className = v;
+      else if (k === "style") node.style.cssText = v;
+      else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+      else node.setAttribute(k, v === true ? "" : v);
+    }
+    for (const c of children.flat()) if (c != null && c !== false) node.append(c instanceof Node ? c : String(c));
+    return node;
+  }
+  const SVGNS = "http://www.w3.org/2000/svg";
+  function svg(tag, attrs) {
+    const node = document.createElementNS(SVGNS, tag);
+    for (const [k, v] of Object.entries(attrs || {})) if (v != null) node.setAttribute(k, v);
+    return node;
+  }
+  const ICONS = {
+    good: "M3 8.5l3 3 7-7",
+    critical: "M8 4.5v4M8 11.2v.3",
+    warning: "M8 5v3.5M8 11v.3",
+    info: "M8 7v4.5M8 4.6v.3",
+  };
+  function statusBadge(kind, label) {
+    const color = { good: "var(--good)", critical: "var(--critical)", warning: "var(--warning)", info: "var(--muted)" }[kind];
+    const icon = svg("svg", { viewBox: "0 0 16 16", "aria-hidden": "true" });
+    if (kind === "good") {
+      icon.append(svg("circle", { cx: 8, cy: 8, r: 7.5, fill: color }));
+      icon.append(svg("path", { d: ICONS.good, stroke: "#fff", "stroke-width": 1.8, fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round" }));
+    } else if (kind === "warning") {
+      icon.append(svg("path", { d: "M8 1 15.5 14.5H.5z", fill: color, "stroke-linejoin": "round" }));
+      icon.append(svg("path", { d: ICONS.warning, stroke: "#0b0b0b", "stroke-width": 1.8, "stroke-linecap": "round" }));
+    } else {
+      icon.append(svg("circle", { cx: 8, cy: 8, r: 7.5, fill: color }));
+      icon.append(svg("path", { d: ICONS[kind], stroke: "#fff", "stroke-width": 1.8, "stroke-linecap": "round" }));
+    }
+    return el("span", { class: "status" }, icon, label);
+  }
+  const severityKind = (s) => (s === "critical" ? "critical" : s === "warning" ? "warning" : "info");
+  const severityLabel = (s) => (s === "critical" ? "Critical" : s === "warning" ? "Warning" : "Info");
+
+  // ---------- API ----------
+  class AuthError extends Error {}
+  async function api(path, opts = {}) {
+    const headers = { "X-Guard-Request": "1" };
+    if (state.token) headers.Authorization = "Bearer " + state.token;
+    const res = await fetch(path, { method: opts.method || "GET", headers, credentials: "same-origin" });
+    let body = null;
+    try { body = await res.json(); } catch {}
+    if (res.status === 401 || res.status === 503) throw Object.assign(new AuthError(body?.error || "unauthorized"), { body, status: res.status });
+    if (!res.ok && res.status !== 207) throw new Error(body?.error || "HTTP " + res.status);
+    return body;
+  }
+
+  // ---------- boot / auth ----------
+  async function boot() {
+    try {
+      await refresh();
+      showApp();
+    } catch (e) {
+      if (e instanceof AuthError) showLogin(e);
+      else showApp(e);
+    }
+  }
+  function showLogin(err) {
+    $("app").hidden = true;
+    $("refresh").hidden = $("signout").hidden = true;
+    $("login").hidden = false;
+    $("meta").replaceChildren();
+    if (err?.status === 503) {
+      $("login-text").textContent = "No sign-in method is configured. Set the ADMIN_TOKEN secret (or Cloudflare Access) and redeploy.";
+      $("login-form").hidden = true;
+      return;
+    }
+    if (err?.body?.accessConfigured) {
+      $("login-text").textContent = "Sign in through Cloudflare Access by opening this page on its protected hostname, or paste the ADMIN_TOKEN. The token is kept in this browser only.";
+    }
+    if (state.token) $("login-error").textContent = "That token was rejected.";
+    $("token").focus();
+  }
+  function showApp(err) {
+    $("login").hidden = true;
+    $("app").hidden = false;
+    $("refresh").hidden = false;
+    $("signout").hidden = !state.token;
+    if (err) banner("critical", "Couldn't load data", err.message);
+    // The chart measures its container, which has no width while hidden.
+    if (state.history) renderChart(state.history);
+  }
+  $("login-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    state.token = $("token").value.trim();
+    $("login-error").textContent = "";
+    try {
+      await refresh();
+      store.set(TOKEN_KEY, state.token);
+      $("token").value = "";
+      showApp();
+    } catch (err) {
+      if (err instanceof AuthError) { $("login-error").textContent = "That token was rejected."; state.token = null; }
+      else $("login-error").textContent = err.message;
+    }
+  });
+  $("signout").addEventListener("click", () => {
+    store.set(TOKEN_KEY, null);
+    state.token = null;
+    showLogin();
+    $("login-error").textContent = "";
+  });
+  $("refresh").addEventListener("click", () => refresh().catch(handleError));
+
+  function handleError(e) {
+    if (e instanceof AuthError) showLogin(e);
+    else banner("critical", "Couldn't load data", e.message, true);
+  }
+
+  // ---------- data ----------
+  async function refresh() {
+    $("chart").classList.add("loading");
+    const q = "/api/history?hours=" + state.hours + (state.product ? "&product=" + encodeURIComponent(state.product) : "");
+    const [status, history] = await Promise.all([api("/api/status"), api(q)]);
+    state.status = status;
+    state.history = history;
+    render();
+    $("chart").classList.remove("loading");
+  }
+
+  let transientBanner = null;
+  function banner(kind, title, text, transient) {
+    const node = el("div", { class: "banner " + kind, role: kind === "critical" ? "alert" : "status" },
+      statusBadge(kind, ""), el("div", {}, el("b", {}, title), " ", text));
+    if (transient) { transientBanner?.remove(); transientBanner = node; }
+    $("banners").prepend(node);
+  }
+
+  // ---------- render ----------
+  function render() {
+    const s = state.status, h = state.history;
+    renderMeta(s);
+    renderBanners(s);
+    renderFilters(s);
+    renderStats(s, h);
+    renderChart(h);
+    renderTop(h);
+    renderEvents(s.recentEvents);
+    renderKillSwitch(s);
+    renderHealth(s);
+    renderConfig(s.config);
+  }
+
+  function renderMeta(s) {
+    const items = [];
+    if (s.lastRunAt) items.push(el("span", { title: new Date(s.lastRunAt).toLocaleString() }, "Last check " + ago(Date.parse(s.lastRunAt))));
+    else items.push(el("span", {}, "Waiting for the first check"));
+    if (s.viewer) items.push(el("span", { class: "who" }, s.viewer));
+    $("meta").replaceChildren(...items);
+  }
+
+  function renderBanners(s) {
+    const nodes = [];
+    for (const p of s.paused) {
+      nodes.push(el("div", { class: "banner critical", role: "alert" }, statusBadge("critical", ""),
+        el("div", {}, el("b", {}, p.script + " is paused"), " by the kill switch " + ago(p.paused_at) + " (" + p.reason + "). Restore it below once it's safe.")));
+    }
+    if (s.lastRunAt && Date.now() - Date.parse(s.lastRunAt) > 20 * 60_000) {
+      nodes.push(el("div", { class: "banner warning", role: "status" }, statusBadge("warning", ""),
+        el("div", {}, el("b", {}, "No check for " + ago(Date.parse(s.lastRunAt)).replace(" ago", "") + "."), " The cron trigger may be disabled or failing; check the Worker's logs.")));
+    }
+    if (!s.lastRunAt) {
+      nodes.push(el("div", { class: "banner warning", role: "status" }, statusBadge("info", ""),
+        el("div", {}, el("b", {}, "No data yet."), " The first check runs within 5 minutes of deploying. Spike detection starts after 24 hours of history.")));
+    }
+    transientBanner = null;
+    $("banners").replaceChildren(...nodes);
+  }
+
+  function renderFilters(s) {
+    for (const b of $("range").querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.hours === state.hours));
+    const sel = $("product");
+    if (sel.options.length === 1) {
+      for (const p of s.config.products) sel.append(el("option", { value: p }, productName(p)));
+    }
+    sel.value = state.product;
+  }
+
+  function renderStats(s, h) {
+    const rate = s.currentHourlyUsd;
+    $("now-rate").replaceChildren(usd(rate), el("small", {}, " /hour"));
+    $("now-note").textContent = rate == null ? "No data yet" : "≈ " + usd(rate * 24) + "/day if it keeps up · bucket starting " + fmtTime(Date.parse(s.lastBucket));
+
+    const total = Object.values(h.totals).reduce((a, b) => a + b, 0);
+    const rangeName = { 6: "Last 6 hours", 24: "Last 24 hours", 168: "Last 7 days" }[h.hours];
+    $("range-label").textContent = rangeName + (h.product ? " · " + productName(h.product) : "");
+    $("range-total").textContent = usd(total);
+    const cov = h.coverage.reduce((a, b) => a + b, 0) / h.coverage.length;
+    $("range-note").textContent = cov >= 0.995 ? "Estimated from list prices" : Math.round(cov * 100) + "% of the period collected";
+
+    const m = s.month;
+    $("mtd").textContent = m ? usd(m.monthToDateUsd) : "–";
+    $("mtd-note").textContent = m ? "Since the 1st (UTC), from collected data" : "";
+    $("proj").textContent = m ? usd(m.projectedUsd) : "–";
+    const meter = $("proj-meter");
+    if (m && m.budgetUsd) {
+      const pct = m.projectedUsd / m.budgetUsd;
+      meter.hidden = false;
+      meter.className = "meter" + (pct > 1 ? " over" : pct > 0.8 ? " warn" : "");
+      meter.firstElementChild.style.width = Math.min(100, pct * 100) + "%";
+      meter.setAttribute("role", "meter");
+      meter.setAttribute("aria-valuemin", "0");
+      meter.setAttribute("aria-valuemax", String(m.budgetUsd));
+      meter.setAttribute("aria-valuenow", String(m.projectedUsd.toFixed(2)));
+      meter.setAttribute("aria-label", "Projected spend against budget");
+      const note = $("proj-note");
+      note.replaceChildren();
+      if (pct > 1) note.append(statusBadge("critical", Math.round(pct * 100) + "% of " + usd(m.budgetUsd) + " budget"));
+      else if (pct > 0.8) note.append(statusBadge("warning", Math.round(pct * 100) + "% of " + usd(m.budgetUsd) + " budget"));
+      else note.append(Math.round(pct * 100) + "% of " + usd(m.budgetUsd) + " budget");
+    } else {
+      meter.hidden = true;
+      $("proj-note").textContent = m ? "At the last 24h average (" + usd(m.avgHourlyUsd) + "/h). No budget set." : "";
+    }
+  }
+
+  // ---------- chart ----------
+  function seriesColor(h, key, i) {
+    if (key === "Other") return "var(--other)";
+    if (!h.product) return "var(" + SLOTS[PRODUCTS.indexOf(key)] + ")";
+    return "var(" + SLOTS[i] + ")";
+  }
+  const seriesLabel = (h, key) => (h.product ? key : productName(key));
+
+  function niceMax(v) {
+    if (v <= 0) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(v)));
+    for (const m of [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (m * p >= v) return m * p;
+    return 10 * p;
+  }
+
+  function renderChart(h) {
+    const stepLabel = { 300000: "5-minute", 900000: "15-minute", 3600000: "hourly" }[h.stepMs];
+    $("chart-title").textContent = h.product ? "Estimated spend · " + productName(h.product) : "Estimated spend by product";
+    $("chart-sub").textContent = "Each column is the " + stepLabel + " total" + (h.product ? ", top resources stacked" : "") + ". List prices, before included allowances.";
+
+    // Legend: rect swatches mirror the bars. In "all products" mode, a click drills in.
+    const legend = $("legend");
+    legend.replaceChildren(...h.keys.map((k, i) => {
+      const sw = el("span", { class: "sw", style: "background:" + seriesColor(h, k, i) });
+      const inner = [sw, el("span", { class: "name" }, seriesLabel(h, k)), el("span", { class: "amt" }, usd(h.totals[k]))];
+      return el("li", {}, !h.product
+        ? el("button", { type: "button", title: "Show " + productName(k) + " by resource", onclick: () => setProduct(k) }, ...inner)
+        : inner);
+    }));
+    if (h.product) legend.append(el("li", {}, el("button", { type: "button", onclick: () => setProduct("") }, el("span", { class: "name" }, "← All products"))));
+
+    const box = $("chart");
+    const total = Object.values(h.totals).reduce((a, b) => a + b, 0);
+    if (!h.keys.length || total === 0) {
+      box.replaceChildren(el("div", { class: "empty" }, h.coverage.some((c) => c > 0) ? "No billable usage in this period." : "No data collected in this period yet."));
+      renderChartTable(h);
+      return;
+    }
+
+    const W = Math.max(320, box.clientWidth || 800), H = 280;
+    const m = { l: 52, r: 8, t: 10, b: 26 };
+    const pw = W - m.l - m.r, ph = H - m.t - m.b;
+    const n = h.times.length;
+    const stacks = h.times.map((_, i) => h.keys.reduce((a, k) => a + h.series[k][i], 0));
+    const ymax = niceMax(Math.max(...stacks));
+    const y = (v) => m.t + ph - (v / ymax) * ph;
+    const band = pw / n;
+    const gap = band >= 8 ? 2 : 1;
+    const bw = Math.max(1, Math.min(24, band - gap));
+
+    const root = svg("svg", { viewBox: "0 0 " + W + " " + H, role: "img", tabindex: "0",
+      "aria-label": "Stacked columns of estimated spend per " + stepLabel + " period. Use arrow keys to read values, or show the table." });
+
+    // Gridlines and y ticks
+    for (let i = 0; i <= 4; i++) {
+      const v = (ymax / 4) * i, yy = Math.round(y(v)) + 0.5;
+      root.append(svg("line", { x1: m.l, x2: W - m.r, y1: yy, y2: yy, stroke: i === 0 ? "var(--axis)" : "var(--grid)", "stroke-width": 1 }));
+      const t = svg("text", { x: m.l - 8, y: yy + 3.5, "text-anchor": "end", class: "tick" });
+      t.textContent = axisUsd(v);
+      root.append(t);
+    }
+    // X ticks: aim for ~6 labels
+    const every = Math.max(1, Math.ceil(n / Math.max(2, Math.floor(pw / 110))));
+    const multiDay = h.hours > 24;
+    for (let i = 0; i < n; i += every) {
+      const t = svg("text", { x: m.l + band * i + band / 2, y: H - 8, "text-anchor": "middle", class: "tick" });
+      t.textContent = multiDay ? new Date(h.times[i]).toLocaleDateString(undefined, { weekday: "short", hour: "numeric" }) : fmtTime(h.times[i]);
+      root.append(t);
+    }
+
+    // Stacked columns: 2px surface gap between segments, 4px rounded data-end on top only.
+    const bars = svg("g", {});
+    const highlight = svg("rect", { fill: "var(--text)", opacity: 0, rx: 3, "pointer-events": "none" });
+    for (let i = 0; i < n; i++) {
+      const x = m.l + band * i + (band - bw) / 2;
+      let acc = 0;
+      const segs = h.keys.map((k, j) => ({ k, j, v: h.series[k][i] })).filter((s) => s.v > 0);
+      segs.forEach((s, idx) => {
+        const y0 = y(acc), y1 = y(acc + s.v);
+        acc += s.v;
+        const isTop = idx === segs.length - 1;
+        let top = y1, bottom = y0;
+        if (idx > 0) bottom -= gap; // surface gap below this segment
+        if (bottom - top < 0.5) return;
+        const r = isTop ? Math.min(4, bw / 2, bottom - top) : 0;
+        const d = "M" + x + "," + bottom + "V" + (top + r) + (r ? "Q" + x + "," + top + " " + (x + r) + "," + top : "") +
+          "H" + (x + bw - r) + (r ? "Q" + (x + bw) + "," + top + " " + (x + bw) + "," + (top + r) : "") + "V" + bottom + "Z";
+        bars.append(svg("path", { d, fill: seriesColor(h, s.k, s.j) }));
+      });
+    }
+    root.append(highlight, bars);
+
+    // Tooltip: per-column hit areas (full band, full height — bigger than the mark).
+    const tip = el("div", { class: "tip", hidden: true, role: "status" });
+    const hits = svg("g", {});
+    let active = -1;
+    function show(i, clientX) {
+      active = i;
+      const x = m.l + band * i;
+      highlight.setAttribute("x", x + (band - Math.min(band, bw + 6)) / 2);
+      highlight.setAttribute("width", Math.min(band, bw + 6));
+      highlight.setAttribute("y", m.t);
+      highlight.setAttribute("height", ph);
+      highlight.setAttribute("opacity", 0.06);
+
+      const end = h.times[i] + h.stepMs;
+      const rows = h.keys.map((k, j) => ({ k, j, v: h.series[k][i] })).filter((r) => r.v > 0).sort((a, b) => b.v - a.v);
+      tip.replaceChildren(
+        el("div", { class: "t" }, fmtTime(h.times[i], multiDay) + " – " + fmtTime(end)),
+        ...rows.map((r) => el("div", { class: "row" }, el("span", { class: "key", style: "background:" + seriesColor(h, r.k, r.j) }),
+          el("div", { class: "val" }, el("b", {}, usd(r.v)), el("span", {}, seriesLabel(h, r.k))))),
+        el("div", { class: "row total" }, el("span", {}), el("div", { class: "val" }, el("b", {}, usd(stacks[i])), el("span", {}, "total · ≈ " + usd(stacks[i] * 3600000 / h.stepMs) + "/h"))),
+        h.coverage[i] < 0.995 ? el("div", { class: "gap" }, h.coverage[i] === 0 ? "Not collected" : Math.round(h.coverage[i] * 100) + "% of this period collected") : "",
+      );
+      tip.hidden = false;
+      const bx = box.getBoundingClientRect();
+      const scale = bx.width / W;
+      const px = (x + band / 2) * scale;
+      const tw = tip.offsetWidth;
+      let left = px + 14;
+      if (left + tw > bx.width) left = px - tw - 14;
+      tip.style.left = Math.max(0, left) + "px";
+      tip.style.top = "8px";
+    }
+    function hide() {
+      active = -1;
+      tip.hidden = true;
+      highlight.setAttribute("opacity", 0);
+    }
+    for (let i = 0; i < n; i++) {
+      const r = svg("rect", { x: m.l + band * i, y: m.t, width: band, height: ph, fill: "transparent" });
+      r.addEventListener("pointerenter", () => show(i));
+      hits.append(r);
+    }
+    root.append(hits);
+    root.addEventListener("pointerleave", hide);
+    root.addEventListener("blur", hide);
+    root.addEventListener("keydown", (e) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight" && e.key !== "Home" && e.key !== "End") return;
+      e.preventDefault();
+      let i = active < 0 ? n - 1 : active;
+      if (e.key === "ArrowLeft") i = Math.max(0, i - 1);
+      if (e.key === "ArrowRight") i = Math.min(n - 1, i + 1);
+      if (e.key === "Home") i = 0;
+      if (e.key === "End") i = n - 1;
+      show(i);
+    });
+    root.addEventListener("focus", () => { if (active < 0) show(n - 1); });
+
+    box.replaceChildren(root, tip);
+    renderChartTable(h);
+  }
+
+  function renderChartTable(h) {
+    const wrap = $("chart-table");
+    const rows = h.times.map((t, i) => ({ t, i, total: h.keys.reduce((a, k) => a + h.series[k][i], 0) })).filter((r) => r.total > 0).reverse();
+    if (!rows.length) { wrap.replaceChildren(el("p", { class: "hint" }, "No usage in this period.")); return; }
+    wrap.replaceChildren(el("table", {},
+      el("thead", {}, el("tr", {}, el("th", {}, "Period start"), ...h.keys.map((k) => el("th", { class: "num" }, seriesLabel(h, k))), el("th", { class: "num" }, "Total"))),
+      el("tbody", {}, ...rows.map((r) => el("tr", {},
+        el("td", {}, fmtTime(r.t, true)),
+        ...h.keys.map((k) => el("td", { class: "num" }, h.series[k][r.i] ? usd(h.series[k][r.i]) : "–")),
+        el("td", { class: "num" }, usd(r.total)))))));
+  }
+  $("toggle-table").addEventListener("click", () => {
+    state.showTable = !state.showTable;
+    $("chart-table").hidden = !state.showTable;
+    $("toggle-table").textContent = state.showTable ? "Hide table" : "Show table";
+    $("toggle-table").setAttribute("aria-expanded", String(state.showTable));
+  });
+
+  function renderTop(h) {
+    const rangeName = { 6: "last 6 hours", 24: "last 24 hours", 168: "last 7 days" }[h.hours];
+    $("top-sub").textContent = "Estimated cost, " + rangeName + (h.product ? " · " + productName(h.product) : "");
+    const top = h.top.filter((r) => r.cost > 0);
+    if (!top.length) { $("top").replaceChildren(el("p", { class: "hint" }, "Nothing billable in this period.")); return; }
+    const max = top[0].cost;
+    $("top").replaceChildren(el("table", {},
+      el("thead", {}, el("tr", {}, el("th", {}, "Resource"), el("th", { class: "num" }, "Cost"))),
+      el("tbody", {}, ...top.map((r) => el("tr", {},
+        el("td", { class: "res" }, r.resource, " ", el("span", { class: "pill" }, productName(r.product))),
+        el("td", { class: "num" }, usd(r.cost), el("span", { class: "share", style: "width:" + Math.max(2, (r.cost / max) * 56) + "px", "aria-hidden": "true" })))))));
+  }
+
+  function renderEvents(events) {
+    const list = $("events");
+    if (!events.length) { list.replaceChildren(el("li", { class: "hint" }, "No alerts yet. That's the goal.")); return; }
+    list.replaceChildren(...events.map((e) => {
+      let detail = e.detail;
+      if (detail && detail.startsWith("{")) { try { detail = JSON.stringify(JSON.parse(detail), null, 2); } catch {} }
+      return el("li", {},
+        el("div", { class: "line" }, statusBadge(severityKind(e.severity), severityLabel(e.severity)),
+          el("span", { class: "title" }, e.title),
+          el("time", { datetime: new Date(e.at).toISOString(), title: new Date(e.at).toLocaleString() }, ago(e.at))),
+        detail ? el("details", {}, el("summary", {}, "Details"), el("pre", {}, detail)) : null);
+    }));
+  }
+
+  function renderKillSwitch(s) {
+    const ks = s.config.killSwitch;
+    const pauseRules = s.config.rules.filter((r) => r.action === "pause").length;
+    $("ks-sub").replaceChildren(
+      ks.enabled
+        ? statusBadge(ks.dryRun ? "warning" : "good", ks.dryRun ? "Dry run: alerts only, nothing is paused" : "Armed")
+        : statusBadge("info", "Off: rules alert but never pause"),
+      " · " + pauseRules + " pause rule" + (pauseRules === 1 ? "" : "s"));
+
+    const box = $("paused");
+    if (!s.paused.length) { box.replaceChildren(el("p", { class: "hint" }, "No Workers are paused. Use Preview to see what pausing a Worker would detach.")); return; }
+    box.replaceChildren(el("ul", { class: "checks" }, ...s.paused.map((p) => {
+      const sn = p.snapshot;
+      const what = [sn.routes.length && sn.routes.length + " route(s)", sn.workersDev && "workers.dev", sn.domains.length && sn.domains.length + " domain(s)", sn.schedules.length && sn.schedules.length + " cron(s)"].filter(Boolean).join(", ");
+      const btn = el("button", { class: "btn small primary", type: "button" }, "Restore");
+      btn.addEventListener("click", async () => {
+        if (!confirm("Restore " + p.script + "? Its routes, domains and crons will be re-attached.")) return;
+        btn.disabled = true;
+        try {
+          const r = await api("/api/restore?script=" + encodeURIComponent(p.script), { method: "POST" });
+          $("pause-result").textContent = r.errors.length ? "Restored with errors: " + r.errors.join("; ") : "Restored " + p.script + ".";
+          await refresh();
+        } catch (e) { $("pause-result").textContent = e.message; btn.disabled = false; }
+      });
+      return el("li", {}, el("div", {}, el("b", {}, p.script), el("div", { class: "hint" }, "Paused " + ago(p.paused_at) + " · " + (what || "nothing attached") + " · " + p.reason)), btn);
+    })));
+  }
+
+  $("pause-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const dry = e.submitter?.dataset.dry === "1";
+    const script = $("pause-script").value.trim();
+    if (!script) return;
+    if (!dry && !confirm("Pause " + script + " now? Traffic to it stops until you restore it.")) return;
+    const out = $("pause-result");
+    out.textContent = dry ? "Checking…" : "Pausing…";
+    try {
+      const r = await api("/api/pause?script=" + encodeURIComponent(script) + (dry ? "&dryRun=1" : ""), { method: "POST" });
+      const sn = r.snapshot;
+      const what = [
+        sn.routes.length && sn.routes.length + " route(s): " + sn.routes.map((x) => x.pattern).join(", "),
+        sn.workersDev && "its workers.dev URL",
+        sn.domains.length && sn.domains.length + " custom domain(s): " + sn.domains.map((d) => d.hostname).join(", "),
+        sn.schedules.length && sn.schedules.length + " cron trigger(s)",
+      ].filter(Boolean);
+      out.replaceChildren(
+        (dry ? "Pausing " + script + " would detach " : "Paused " + script + ": detached ") + (what.length ? what.join("; ") : "nothing (no routes, domains or crons found)") + ".",
+        r.errors.length ? el("div", { class: "error" }, r.errors.join("; ")) : "");
+      if (!dry) await refresh();
+    } catch (err) { out.textContent = err.message; }
+  });
+
+  function renderHealth(s) {
+    const failing = new Map((s.latestCollectorErrors || []).map((e) => [e.collector, e.message]));
+    const active = new Set(s.config.products);
+    const rows = [];
+    for (const p of PRODUCTS) {
+      if (!active.has(p)) continue;
+      const errs = [...failing.entries()].filter(([c]) => c.startsWith(p + "."));
+      rows.push(el("li", {},
+        el("div", {}, productName(p), errs.length ? el("div", { class: "err" }, errs.map(([, m]) => m).join("; ")) : null),
+        s.lastRunAt ? statusBadge(errs.length ? "critical" : "good", errs.length ? "Failing" : "OK") : statusBadge("info", "Pending")));
+    }
+    $("health").replaceChildren(...rows);
+  }
+
+  async function action(btn, path, describe) {
+    const out = $("health-result");
+    btn.disabled = true;
+    out.textContent = "Working…";
+    try {
+      const r = await api(path, { method: path === "/api/doctor" ? "GET" : "POST" });
+      out.replaceChildren(...describe(r));
+    } catch (e) { out.textContent = e.message; }
+    btn.disabled = false;
+  }
+  $("doctor").addEventListener("click", (e) => action(e.currentTarget, "/api/doctor", (r) => {
+    const tokenOk = r.token && !r.token.error;
+    const failed = r.collectors.filter((c) => !c.ok);
+    const channels = Object.entries(r.channels).filter(([, v]) => v).map(([k]) => k);
+    return [el("ul", { class: "checks" },
+      el("li", {}, "API token", statusBadge(tokenOk ? "good" : "critical", tokenOk ? "Valid" : r.token.error)),
+      el("li", {}, "Account", el("code", {}, r.accountId)),
+      ...r.collectors.map((c) => el("li", {}, el("div", {}, c.id, c.error ? el("div", { class: "err" }, c.error) : null), statusBadge(c.ok ? "good" : "critical", c.ok ? "OK" : "Failing"))),
+      el("li", {}, "Alert channels", channels.length ? channels.join(", ") : statusBadge("warning", "None configured")),
+    ), failed.length ? el("p", { class: "hint" }, "A failing collector usually means a missing token permission, or a product you don't use on this account.") : null];
+  }));
+  $("test-alert").addEventListener("click", (e) => action(e.currentTarget, "/api/test-alert", (r) =>
+    [r.ok ? statusBadge("good", "Sent to every configured channel") : statusBadge("critical", "Failed: " + r.failed.join(", "))]));
+  $("run-now").addEventListener("click", (e) => action(e.currentTarget, "/api/run", (r) => {
+    refresh().catch(handleError);
+    return ["Collected " + r.samples + " series for the bucket starting " + fmtTime(Date.parse(r.bucket)) + ". " +
+      (r.alerts.length ? r.alerts.length + " alert(s) raised." : "No alerts.") +
+      (r.collectorErrors.length ? " " + r.collectorErrors.length + " collector error(s)." : "")];
+  }));
+
+  function renderConfig(c) {
+    const items = [
+      ["Monthly budget", c.monthlyBudgetUsd ? usd(c.monthlyBudgetUsd) : "Not set"],
+      ["Rules", c.rules.length ? c.rules.map((r) => r.name + " (> " + usd(r.hourlyUsd) + "/h → " + (r.action || "alert") + ")").join(" · ") : "None"],
+      ["Spike detection", c.anomaly.enabled ? "≥ " + c.anomaly.ratio + "× normal and ≥ " + usd(c.anomaly.minExcessHourlyUsd) + "/h extra, vs the last " + c.anomaly.baselineDays + " days" : "Off"],
+      ["Products", c.products.map(productName).join(", ")],
+    ];
+    $("config-summary").replaceChildren(el("table", {}, el("tbody", {}, ...items.map(([k, v]) => el("tr", {}, el("th", { scope: "row" }, k), el("td", {}, v))))));
+    $("config").textContent = JSON.stringify(c, null, 2);
+  }
+
+  // ---------- filters ----------
+  function savePrefs() { store.set(PREFS_KEY, JSON.stringify({ hours: state.hours })); }
+  $("range").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b || b.dataset.hours === state.hours) return;
+    state.hours = b.dataset.hours;
+    savePrefs();
+    refresh().catch(handleError);
+  });
+  function setProduct(p) {
+    state.product = p;
+    refresh().catch(handleError);
+  }
+  $("product").addEventListener("change", (e) => setProduct(e.target.value));
+
+  let resizeTimer;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => state.history && renderChart(state.history), 150);
+  });
+  setInterval(() => { if (!document.hidden && !$("app").hidden) refresh().catch(handleError); }, 60_000);
+
+  boot();
+})();
+</script>
+</body>
+</html>

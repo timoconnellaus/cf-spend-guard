@@ -17,10 +17,10 @@
   "cloudflare": {
     "bindings": {
       "CF_API_TOKEN": {
-        "description": "Cloudflare API token the guard uses to read analytics (and, if you turn on the kill switch, to pause Workers). Create one at [dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens) with **Account › Account Analytics › Read**. For the kill switch also add **Account › Workers Scripts › Edit**, **Zone › Workers Routes › Edit** and **Zone › Zone › Read**."
+        "description": "Cloudflare API token the guard uses to read analytics (and, if you turn on the kill switch, to pause Workers). Create one at [dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens) with **Account \u203a Account Analytics \u203a Read**. For the kill switch also add **Account \u203a Workers Scripts \u203a Edit**, **Zone \u203a Workers Routes \u203a Edit** and **Zone \u203a Zone \u203a Read**."
       },
       "ADMIN_TOKEN": {
-        "description": "A long random string that protects the guard's `/api/*` endpoints (status, pause, restore). Generate one with `openssl rand -hex 32`."
+        "description": "A long random string for signing in to the dashboard and calling the `/api/*` endpoints. Generate one with `openssl rand -hex 32`. Optional if you set up Cloudflare Access."
       },
       "SLACK_WEBHOOK_URL": {
         "description": "Optional. A Slack [incoming webhook](https://api.slack.com/messaging/webhooks) URL for alerts. Leave empty to skip."
@@ -36,6 +36,12 @@
       },
       "CF_ACCOUNT_ID": {
         "description": "Optional. The account to watch. If the API token can see exactly one account it is detected automatically."
+      },
+      "ACCESS_TEAM_DOMAIN": {
+        "description": "Optional. Your Cloudflare Access team domain (e.g. `acme` or `acme.cloudflareaccess.com`), to sign in to the dashboard with Access instead of the admin token. Leave empty to skip; see README.md#dashboard-and-sign-in."
+      },
+      "ACCESS_AUD": {
+        "description": "Optional. The Application Audience (AUD) tag of the Access application protecting the guard. Required together with `ACCESS_TEAM_DOMAIN`."
       }
     }
   },

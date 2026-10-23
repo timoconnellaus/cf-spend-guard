@@ -1,13 +1,20 @@
+import { verifyAccessJwt } from "./access";
 import { CloudflareClient } from "./cloudflare/api";
 import { collect, COLLECTORS } from "./collectors";
 import { ConfigError, loadConfig, type Env } from "./config";
+import dashboard from "./dashboard.html";
 import { BUCKET_MS, BUCKETS_PER_HOUR } from "./detect";
-import { bucketFor, runGuard } from "./guard";
+import { bucketFor, monthSummary, runGuard } from "./guard";
 import { pauseScript, restoreScript, SELF_SCRIPT } from "./killswitch";
 import { sendAlert } from "./notify";
+import { PRODUCTS } from "./pricing";
+import { history } from "./history";
 import { Store } from "./store";
 
-const DAY = 86_400_000;
+const HOUR = 3_600_000;
+const DAY = 24 * HOUR;
+/** History ranges the dashboard offers, and the step each is drawn at. */
+const RANGES: Record<string, number> = { "6": 5 * 60_000, "24": 15 * 60_000, "168": HOUR };
 
 export default {
   async scheduled(_controller, env) {
@@ -26,15 +33,25 @@ export default {
 
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.pathname === "/") {
-      return new Response(
-        "cf-spend-guard is running.\nAPI (Authorization: Bearer <ADMIN_TOKEN>): GET /api/status, GET /api/doctor, POST /api/run, POST /api/test-alert, POST /api/pause?script=, POST /api/restore?script=\n",
-        { headers: { "Content-Type": "text/plain; charset=utf-8" } },
-      );
+    if (url.pathname === "/" && (request.method === "GET" || request.method === "HEAD")) {
+      return new Response(dashboard, {
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Content-Security-Policy":
+            "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+          "Cache-Control": "no-store",
+        },
+      });
     }
     if (!url.pathname.startsWith("/api/")) return json({ error: "not found" }, 404);
-    if (!env.ADMIN_TOKEN) return json({ error: "ADMIN_TOKEN secret is not set" }, 503);
-    if (!authorized(request, env.ADMIN_TOKEN)) return json({ error: "unauthorized" }, 401);
+
+    const auth = await authenticate(request, env);
+    if (auth.status !== 200) return json({ error: auth.error, accessConfigured: accessConfigured(env) }, auth.status);
+    // Access sessions ride on a cookie, so state-changing calls must also carry a
+    // custom header, which a cross-site form or fetch can't send without CORS.
+    if (request.method !== "GET" && auth.via === "access" && request.headers.get("X-Guard-Request") !== "1") {
+      return json({ error: "missing X-Guard-Request header" }, 403);
+    }
 
     try {
       const config = loadConfig(env.GUARD_CONFIG);
@@ -42,23 +59,43 @@ export default {
       const store = new Store(env.DB);
       const route = `${request.method} ${url.pathname}`;
       const script = url.searchParams.get("script") ?? "";
+      const now = Date.now();
 
       switch (route) {
         case "GET /api/status": {
-          const now = Date.now();
           const runs = await store.recentRuns(BUCKETS_PER_HOUR);
-          const last24h = await store.costSince(now - DAY);
+          const latest = runs[0];
+          const month = latest ? await monthSummary(store, now, latest.bucket) : null;
           return json({
-            lastBucket: runs[0] ? new Date(runs[0].bucket).toISOString() : null,
-            lastRunAt: runs[0] ? new Date(runs[0].ran_at).toISOString() : null,
-            currentHourlyUsd: runs[0] ? runs[0].total_cost * BUCKETS_PER_HOUR : null,
-            estimatedUsdLast24h: last24h,
+            viewer: auth.viewer,
+            lastBucket: latest ? new Date(latest.bucket).toISOString() : null,
+            lastRunAt: latest ? new Date(latest.ran_at).toISOString() : null,
+            currentHourlyUsd: latest ? latest.total_cost * BUCKETS_PER_HOUR : null,
+            estimatedUsdLast24h: await store.costSince(now - DAY),
+            month: month && {
+              monthToDateUsd: month.monthToDateUsd,
+              projectedUsd: month.projectedUsd,
+              avgHourlyUsd: month.avgHourlyUsd,
+              budgetUsd: config.monthlyBudgetUsd ?? null,
+            },
             topResourcesLast24h: await store.topResources(now - DAY, 10),
-            recentCollectorErrors: runs.filter((r) => r.errors).map((r) => ({ bucket: new Date(r.bucket).toISOString(), errors: JSON.parse(r.errors!) })),
+            latestCollectorErrors: latest?.errors ? JSON.parse(latest.errors) : [],
+            recentCollectorErrors: runs
+              .filter((r) => r.errors)
+              .map((r) => ({ bucket: new Date(r.bucket).toISOString(), errors: JSON.parse(r.errors!) })),
             paused: (await store.listPaused()).map((p) => ({ ...p, snapshot: JSON.parse(p.snapshot) })),
-            recentEvents: await store.recentEvents(25),
+            recentEvents: await store.recentEvents(50),
             config,
           });
+        }
+
+        case "GET /api/history": {
+          const hours = url.searchParams.get("hours") ?? "24";
+          const stepMs = RANGES[hours];
+          if (!stepMs) return json({ error: `hours must be one of ${Object.keys(RANGES).join(", ")}` }, 400);
+          const product = url.searchParams.get("product") || undefined;
+          if (product && !PRODUCTS.includes(product as any)) return json({ error: `unknown product ${product}` }, 400);
+          return json(await history(store, Number(hours), stepMs, product, now));
         }
 
         case "GET /api/doctor": {
@@ -69,7 +106,7 @@ export default {
             checks.token = { error: (e as Error).message };
           }
           const accountId = await client.resolveAccountId(env.CF_ACCOUNT_ID || config.accountId);
-          const bucket = bucketFor(Date.now(), config.lagMinutes);
+          const bucket = bucketFor(now, config.lagMinutes);
           const result = await collect(client, accountId, config.products, bucket - 11 * BUCKET_MS, bucket + BUCKET_MS);
           checks.accountId = accountId;
           checks.window = `last hour ending ${new Date(bucket + BUCKET_MS).toISOString()}`;
@@ -85,6 +122,7 @@ export default {
             webhook: !!env.ALERT_WEBHOOK_URL,
             pagerduty: !!env.PAGERDUTY_ROUTING_KEY,
           };
+          checks.auth = { adminToken: !!env.ADMIN_TOKEN, access: accessConfigured(env) };
           return json(checks);
         }
 
@@ -109,16 +147,30 @@ export default {
           }
           const accountId = await client.resolveAccountId(env.CF_ACCOUNT_ID || config.accountId);
           const dryRun = url.searchParams.get("dryRun") === "1";
-          const r = await pauseScript(client, store, accountId, script, "Manual pause via API", dryRun);
-          await store.addEvent({ at: Date.now(), severity: "critical", kind: "kill_switch", title: `${dryRun ? "DRY RUN: would pause" : "Paused"} ${script} (manual)`, detail: JSON.stringify(r) });
+          if (!dryRun && (await store.getPaused(script))) return json({ error: `${script} is already paused` }, 409);
+          const r = await pauseScript(client, store, accountId, script, `Manual pause by ${auth.viewer}`, dryRun);
+          await store.addEvent({
+            at: now,
+            severity: "critical",
+            kind: "kill_switch",
+            title: `${dryRun ? "DRY RUN: would pause" : "Paused"} ${script} (manual, ${auth.viewer})`,
+            detail: JSON.stringify(r),
+          });
           return json(r);
         }
 
         case "POST /api/restore": {
           if (!script) return json({ error: "?script= is required" }, 400);
+          if (!(await store.getPaused(script))) return json({ error: `${script} is not paused by cf-spend-guard` }, 404);
           const accountId = await client.resolveAccountId(env.CF_ACCOUNT_ID || config.accountId);
           const r = await restoreScript(client, store, accountId, script);
-          await store.addEvent({ at: Date.now(), severity: "info", kind: "kill_switch", title: `Restored ${script}`, detail: JSON.stringify(r) });
+          await store.addEvent({
+            at: now,
+            severity: "info",
+            kind: "kill_switch",
+            title: `Restored ${script} (${auth.viewer})`,
+            detail: JSON.stringify(r),
+          });
           return json(r, r.errors.length ? 207 : 200);
         }
       }
@@ -130,14 +182,54 @@ export default {
   },
 } satisfies ExportedHandler<Env>;
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body, null, 2), { status, headers: { "Content-Type": "application/json" } });
+type Auth = { status: 200; viewer: string; via: "token" | "access" } | { status: 401 | 503; error: string };
+
+function accessConfigured(env: Env): boolean {
+  return !!(env.ACCESS_TEAM_DOMAIN && env.ACCESS_AUD);
 }
 
-function authorized(request: Request, token: string): boolean {
-  const header = request.headers.get("Authorization") ?? "";
-  const given = new TextEncoder().encode(header.replace(/^Bearer\s+/i, ""));
-  const want = new TextEncoder().encode(token);
-  if (given.byteLength !== want.byteLength) return false;
-  return crypto.subtle.timingSafeEqual(given, want);
+/** Accepts a Cloudflare Access login (if configured) or the ADMIN_TOKEN bearer token. */
+async function authenticate(request: Request, env: Env): Promise<Auth> {
+  if (!env.ADMIN_TOKEN && !accessConfigured(env)) {
+    return { status: 503, error: "No auth configured: set the ADMIN_TOKEN secret, or ACCESS_TEAM_DOMAIN and ACCESS_AUD" };
+  }
+
+  const bearer = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+  if (env.ADMIN_TOKEN && bearer && timingSafeEqual(bearer, env.ADMIN_TOKEN)) return { status: 200, viewer: "admin token", via: "token" };
+
+  if (accessConfigured(env)) {
+    const jwt = request.headers.get("Cf-Access-Jwt-Assertion") ?? cookie(request, "CF_Authorization");
+    if (jwt) {
+      try {
+        const id = await verifyAccessJwt(jwt, env.ACCESS_TEAM_DOMAIN!, env.ACCESS_AUD!);
+        if (id) return { status: 200, viewer: id.email ?? id.sub, via: "access" };
+      } catch (e) {
+        console.error("Access JWT verification failed:", (e as Error).message);
+      }
+    }
+  }
+  return { status: 401, error: "unauthorized" };
+}
+
+function cookie(request: Request, name: string): string | null {
+  const header = request.headers.get("Cookie") ?? "";
+  for (const part of header.split(";")) {
+    const [k, ...v] = part.trim().split("=");
+    if (k === name) return v.join("=");
+  }
+  return null;
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  const x = new TextEncoder().encode(a);
+  const y = new TextEncoder().encode(b);
+  if (x.byteLength !== y.byteLength) return false;
+  return crypto.subtle.timingSafeEqual(x, y);
+}
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body, null, 2), {
+    status,
+    headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+  });
 }

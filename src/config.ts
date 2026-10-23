@@ -10,6 +10,10 @@ export interface Env {
   DISCORD_WEBHOOK_URL?: string;
   ALERT_WEBHOOK_URL?: string;
   PAGERDUTY_ROUTING_KEY?: string;
+  /** Cloudflare Access team domain, e.g. "acme" or "acme.cloudflareaccess.com". */
+  ACCESS_TEAM_DOMAIN?: string;
+  /** The Access application's Audience (AUD) tag. */
+  ACCESS_AUD?: string;
 }
 
 /** Selects usage series. Omitted fields (or "*") match everything. */

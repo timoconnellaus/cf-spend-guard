@@ -110,14 +110,32 @@ export class Store {
     return results;
   }
 
-  async topResources(since: number, limit: number) {
-    const { results } = await this.db
-      .prepare(
-        `SELECT product, resource, SUM(cost) AS cost FROM samples WHERE bucket >= ?
-         GROUP BY product, resource ORDER BY cost DESC LIMIT ?`,
-      )
-      .bind(since, limit)
-      .all<{ product: string; resource: string; cost: number }>();
+  async topResources(since: number, limit: number, product?: string) {
+    const stmt = this.db.prepare(
+      `SELECT product, resource, SUM(cost) AS cost FROM samples WHERE bucket >= ?1 ${product ? "AND product = ?3" : ""}
+       GROUP BY product, resource ORDER BY cost DESC LIMIT ?2`,
+    );
+    const { results } = await (product ? stmt.bind(since, limit, product) : stmt.bind(since, limit)).all<{
+      product: string;
+      resource: string;
+      cost: number;
+    }>();
+    return results;
+  }
+
+  /**
+   * Cost per time step, keyed by product (or by resource within one product).
+   * Steps are aligned to multiples of stepMs since the epoch.
+   */
+  async costHistory(since: number, until: number, stepMs: number, product?: string) {
+    const key = product ? "resource" : "product";
+    const where = product ? "AND product = ?4" : "";
+    const stmt = this.db.prepare(
+      `SELECT (bucket / CAST(?3 AS INTEGER)) * CAST(?3 AS INTEGER) AS t, ${key} AS key, SUM(cost) AS cost FROM samples
+       WHERE bucket >= ?1 AND bucket < ?2 ${where} GROUP BY t, key ORDER BY t`,
+    );
+    const { results } = await (product ? stmt.bind(since, until, stepMs, product) : stmt.bind(since, until, stepMs))
+      .all<{ t: number; key: string; cost: number }>();
     return results;
   }
 

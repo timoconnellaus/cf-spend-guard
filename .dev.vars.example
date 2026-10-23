@@ -10,3 +10,7 @@ ALERT_WEBHOOK_URL=
 PAGERDUTY_ROUTING_KEY=
 # Optional. Detected automatically when the token can see a single account.
 CF_ACCOUNT_ID=
+# Optional. Protect the dashboard with Cloudflare Access instead of / as well as
+# ADMIN_TOKEN. See README.md#dashboard.
+ACCESS_TEAM_DOMAIN=
+ACCESS_AUD=

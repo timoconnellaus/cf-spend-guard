@@ -13,7 +13,11 @@ cf-spend-guard is a small Worker you deploy into your own account. Every 5 minut
 5. **Projects the month** against your budget.
 6. **Alerts** you on Slack, Discord, PagerDuty or any webhook. If you turned on the kill switch, it also **pauses the offending Worker**: routes, workers.dev and custom domains are detached and crons stopped. One API call restores everything.
 
+It also serves a **dashboard** showing your burn rate, spend over time by product and resource, alerts, kill-switch controls and health checks.
+
 It runs on your account, uses your own API token, and sends your data nowhere except the alert channels you set up.
+
+![cf-spend-guard dashboard (demo data)](docs/dashboard.png)
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/timoconnellaus/cf-spend-guard)
 
@@ -43,7 +47,11 @@ npx wrangler secret put SLACK_WEBHOOK_URL   # or another channel
 npm run deploy                              # creates the D1 DB, migrates, deploys
 ```
 
-### Check that it works
+### Open the dashboard
+
+Visit `https://cf-spend-guard.<your-subdomain>.workers.dev/` and sign in with your `ADMIN_TOKEN`, or [put it behind Cloudflare Access](#dashboard-and-sign-in).
+
+### Check that it works from the command line
 
 ```sh
 GUARD=https://cf-spend-guard.<your-subdomain>.workers.dev
@@ -55,6 +63,39 @@ curl -H "$AUTH" $GUARD/api/status             # burn rate, top spenders, recent 
 ```
 
 `/api/doctor` runs every collector against the last hour and reports per-product errors. Run it after deploying. A missing permission or a product you don't use shows up here instead of failing silently.
+
+---
+
+## Dashboard and sign-in
+
+The Worker serves the dashboard at `/`. It shows:
+
+- the current burn rate, the range total, month-to-date and the month-end projection against your budget;
+- a stacked chart of estimated spend over 6 hours, 24 hours or 7 days. Click a product to break it down by Worker, bucket or database;
+- top spenders, alert history, paused Workers with **Restore** buttons, and a manual pause with a dry-run preview;
+- per-product collection health, a full token and collector check, and a test-alert button;
+- the effective config. The dashboard is read-only for config: change rules in `GUARD_CONFIG` and redeploy, so every change to what the kill switch can do goes through git.
+
+![Drill-down in dark mode](docs/dashboard-dark.png)
+
+There are two ways to sign in, and they can be used together:
+
+| | Good for | Setup |
+| --- | --- | --- |
+| **Admin token** | Scripts, curl, getting started | Set the `ADMIN_TOKEN` secret. The dashboard asks for it once and keeps it in that browser only. |
+| **Cloudflare Access** | Day-to-day dashboard use, teams | Sign in with Google, GitHub, email codes or your IdP. No shared secret; free for up to 50 users. |
+
+### Setting up Cloudflare Access
+
+1. In the Cloudflare dashboard open your Worker, go to **Settings → Domains & Routes**, and enable **Cloudflare Access** on the workers.dev route (or on a custom domain). Alternatively, create a **self-hosted application** for that hostname under **Zero Trust → Access → Applications**. Add a policy allowing your email address.
+2. Copy the application's **Application Audience (AUD) tag** and your **team domain** (`<team>.cloudflareaccess.com`, shown under Zero Trust settings).
+3. Set them on the Worker:
+   ```sh
+   npx wrangler secret put ACCESS_TEAM_DOMAIN   # e.g. acme  or  acme.cloudflareaccess.com
+   npx wrangler secret put ACCESS_AUD
+   ```
+
+The guard checks every Access token itself: signature (against your team's public keys), audience, issuer and expiry. Merely having Access in front isn't enough, and a request that skips it, for example via a different route, gets a 401. State-changing calls made with an Access session must also send an `X-Guard-Request: 1` header, which the dashboard does. That blocks cross-site request forgery. Once Access works you can remove `ADMIN_TOKEN` entirely, or keep it for scripts.
 
 ---
 
@@ -186,11 +227,12 @@ You can also pause by hand: `POST /api/pause?script=my-api`. Add `&dryRun=1` to 
 
 ## API
 
-All endpoints need `Authorization: Bearer <ADMIN_TOKEN>`.
+All endpoints need `Authorization: Bearer <ADMIN_TOKEN>` or a Cloudflare Access session.
 
 | Endpoint | |
 | --- | --- |
 | `GET /api/status` | Current burn rate, last 24h estimate, top resources, recent alerts, paused Workers, effective config |
+| `GET /api/history?hours=6\|24\|168[&product=NAME]` | Cost over time by product (or by resource within one product), with coverage and top resources |
 | `GET /api/doctor` | Verifies the token and runs every collector against the last hour |
 | `POST /api/run` | Runs a check now and returns the report |
 | `POST /api/test-alert` | Sends a test alert to every configured channel |
@@ -218,7 +260,7 @@ npm run db:migrate:local
 npm run dev         # then: curl "localhost:8787/__scheduled?cron=*/5+*+*+*+*"
 ```
 
-Code map: `src/collectors.ts` (GraphQL queries, one per product), `src/pricing.ts`, `src/detect.ts` (pure detection logic), `src/guard.ts` (one run), `src/killswitch.ts`, `src/notify.ts`, `src/index.ts` (cron + HTTP API).
+Code map: `src/collectors.ts` (GraphQL queries, one per product), `src/pricing.ts`, `src/detect.ts` (pure detection logic), `src/guard.ts` (one run), `src/killswitch.ts`, `src/notify.ts`, `src/history.ts`, `src/access.ts` (Access JWT checks), `src/dashboard.html` (the whole UI, no build step), `src/index.ts` (cron + HTTP API).
 
 Adding a product usually means adding one collector and its prices. See `CONTRIBUTING.md`.
 
