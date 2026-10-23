@@ -1,0 +1,12 @@
+# Secrets for cf-spend-guard. The Deploy to Cloudflare button asks for these;
+# for local dev copy this file to .dev.vars. See package.json "cloudflare.bindings"
+# for what each one is.
+CF_API_TOKEN=
+ADMIN_TOKEN=
+# Optional alert channels. Leave empty to skip.
+SLACK_WEBHOOK_URL=
+DISCORD_WEBHOOK_URL=
+ALERT_WEBHOOK_URL=
+PAGERDUTY_ROUTING_KEY=
+# Optional. Detected automatically when the token can see a single account.
+CF_ACCOUNT_ID=

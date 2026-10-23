@@ -1,0 +1,32 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cf-spend-guard",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+
+  // Collect usage every 5 minutes. Cloudflare analytics run a few minutes
+  // behind, so each run looks at a bucket that ended LAG_MINUTES ago.
+  "triggers": { "crons": ["*/5 * * * *"] },
+
+  // Leave database_id out: `wrangler deploy` and the Deploy to Cloudflare
+  // button create the database for you on first deploy.
+  "d1_databases": [
+    { "binding": "DB", "database_name": "cf-spend-guard", "migrations_dir": "migrations" }
+  ],
+
+  "observability": { "enabled": true },
+
+  "vars": {
+    // Edit GUARD_CONFIG to set budgets, rules and the kill switch.
+    // Every field is optional; see README.md#configuration for all of them.
+    "GUARD_CONFIG": {
+      "monthlyBudgetUsd": 50,
+      "rules": [
+        { "name": "Account burn rate", "hourlyUsd": 2, "action": "alert" }
+      ],
+      "anomaly": { "enabled": true },
+      "killSwitch": { "enabled": false, "dryRun": true }
+    }
+  }
+}

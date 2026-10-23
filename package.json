@@ -1,0 +1,49 @@
+{
+  "name": "cf-spend-guard",
+  "version": "0.1.0",
+  "description": "Spend monitoring, anomaly detection and an optional kill switch for Cloudflare accounts. Runs as a Worker in your own account.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --test-scheduled",
+    "deploy": "npm run db:migrate && wrangler deploy",
+    "db:migrate": "wrangler d1 migrations apply DB --remote",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "cf-typegen": "wrangler types"
+  },
+  "cloudflare": {
+    "bindings": {
+      "CF_API_TOKEN": {
+        "description": "Cloudflare API token the guard uses to read analytics (and, if you turn on the kill switch, to pause Workers). Create one at [dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens) with **Account › Account Analytics › Read**. For the kill switch also add **Account › Workers Scripts › Edit**, **Zone › Workers Routes › Edit** and **Zone › Zone › Read**."
+      },
+      "ADMIN_TOKEN": {
+        "description": "A long random string that protects the guard's `/api/*` endpoints (status, pause, restore). Generate one with `openssl rand -hex 32`."
+      },
+      "SLACK_WEBHOOK_URL": {
+        "description": "Optional. A Slack [incoming webhook](https://api.slack.com/messaging/webhooks) URL for alerts. Leave empty to skip."
+      },
+      "DISCORD_WEBHOOK_URL": {
+        "description": "Optional. A Discord channel webhook URL for alerts. Leave empty to skip."
+      },
+      "ALERT_WEBHOOK_URL": {
+        "description": "Optional. Any URL that accepts a JSON `POST` of each alert (n8n, Zapier, your own endpoint). Leave empty to skip."
+      },
+      "PAGERDUTY_ROUTING_KEY": {
+        "description": "Optional. A PagerDuty Events API v2 routing key. Only `critical` alerts (rule breaches and kill-switch actions) page. Leave empty to skip."
+      },
+      "CF_ACCOUNT_ID": {
+        "description": "Optional. The account to watch. If the API token can see exactly one account it is detected automatically."
+      }
+    }
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261001.0",
+    "@types/node": "^22.20.5",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7",
+    "wrangler": "^4.140.0"
+  }
+}
